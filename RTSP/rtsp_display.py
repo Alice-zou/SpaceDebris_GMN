@@ -1,0 +1,43 @@
+##########################################################################
+# Testing of rtsp stream display 
+##########################################################################
+# % CPU usage
+##########################################################################
+
+import cv2
+import logging
+import time
+
+from configs.rtsp_configs import configs as configs
+
+# Setting up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("RTSP")
+
+# create camera interface
+from camera.capture.rtspcapture import rtspCapture
+# camera = rtspCapture(rtsp='rtsp://192.168.8.50:8554/unicast')
+# camera = rtspCapture(rtsp='rtsp://10.41.83.100:554/camera')
+logger.log(logging.INFO, "Starting Capture")
+# If you run the local server example (examples/rtsp_server.py), the default URL is:
+#   rtsp://127.0.0.1:8554/test
+camera = rtspCapture(configs, rtsp='rtsp://127.0.0.1:8554/test')
+logger.log(logging.INFO, "Getting Images")
+camera.start()
+
+window_handle = cv2.namedWindow("RTSP", cv2.WINDOW_NORMAL)
+while(cv2.getWindowProperty("RTSP", cv2.WND_PROP_VISIBLE) >= 0):
+    while not camera.log.empty():
+        (level, msg) = camera.log.get_nowait()
+        logger.log(level, msg)
+
+    if camera.buffer and camera.buffer.avail > 0:
+        frame, ts_ms = camera.buffer.pull(copy=False)
+        if frame is not None:
+            cv2.imshow('RTSP', frame)
+    else:
+        time.sleep(0.001)
+    if cv2.waitKey(1) & 0xFF == ord('q'): break
+
+camera.close(timeout=2.0)
+cv2.destroyAllWindows()

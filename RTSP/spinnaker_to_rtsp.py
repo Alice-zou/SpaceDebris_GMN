@@ -165,6 +165,47 @@ def configure_camera(cam):
     sensor_height = node_height.GetValue()
     print(f"[Camera] Sensor output resolution after binning: {sensor_width}x{sensor_height}")
 
+    # Optimize Transport Layer and GigE parameters for stability (MUST be done before setting frame rate)
+    try:
+        # Check if it is a GigE Vision camera
+        nodemap_tldevice = cam.GetTLDeviceNodeMap()
+        device_type_node = PySpin.CEnumerationPtr(nodemap_tldevice.GetNode("DeviceType"))
+        is_gige = False
+        if PySpin.IsAvailable(device_type_node) and PySpin.IsReadable(device_type_node):
+            if device_type_node.GetCurrentEntry().GetSymbolic() == "GigEVision":
+                is_gige = True
+
+        if is_gige:
+            print("  [GigE] Optimizing GigE Vision parameters...")
+            # Set Packet Size to 1500 (standard MTU size compatible with all networks)
+            node_packet_size = PySpin.CIntegerPtr(nodemap.GetNode("GevSCPSPacketSize"))
+            if PySpin.IsAvailable(node_packet_size) and PySpin.IsWritable(node_packet_size):
+                val = min(node_packet_size.GetMax(), 1500)
+                node_packet_size.SetValue(val)
+                print(f"    GevSCPSPacketSize set to {val}")
+            else:
+                print("    GevSCPSPacketSize node NOT writable/available!")
+
+            # Set Packet Delay to pace transmission and prevent drops (e.g. 400)
+            node_packet_delay = PySpin.CIntegerPtr(nodemap.GetNode("GevSCPD"))
+            if PySpin.IsAvailable(node_packet_delay) and PySpin.IsWritable(node_packet_delay):
+                node_packet_delay.SetValue(400)
+                print("    GevSCPD (packet delay) set to 400")
+            else:
+                print("    GevSCPD node NOT writable/available!")
+
+        # Set stream buffer count to a higher value for stability
+        s_node_map = cam.GetTLStreamNodeMap()
+        node_buffer_mode = PySpin.CEnumerationPtr(s_node_map.GetNode("StreamBufferCountMode"))
+        if PySpin.IsAvailable(node_buffer_mode) and PySpin.IsWritable(node_buffer_mode):
+            node_buffer_mode.FromString("Manual")
+            node_buffer_count = PySpin.CIntegerPtr(s_node_map.GetNode("StreamBufferCountNum"))
+            if PySpin.IsAvailable(node_buffer_count) and PySpin.IsWritable(node_buffer_count):
+                node_buffer_count.SetValue(30)
+                print("  [Stream] StreamBufferCountNum set to 30 (expanded for stability)")
+    except Exception as e:
+        print(f"  [Warning] Failed to optimize TL stream parameters: {e}")
+
     # 2. Setup Exposure Control
     node_exposure_auto = PySpin.CEnumerationPtr(nodemap.GetNode("ExposureAuto"))
     if PySpin.IsAvailable(node_exposure_auto) and PySpin.IsWritable(node_exposure_auto):
@@ -222,48 +263,6 @@ def configure_camera(cam):
         print(f"  AcquisitionFrameRate set to {val:.2f} FPS")
     else:
         print("  AcquisitionFrameRate node NOT writable/available!")
-
-    # 5. Optimize Transport Layer and GigE parameters for stability
-    try:
-        # Check if it is a GigE Vision camera
-        nodemap_tldevice = cam.GetTLDeviceNodeMap()
-        device_type_node = PySpin.CEnumerationPtr(nodemap_tldevice.GetNode("DeviceType"))
-        is_gige = False
-        if PySpin.IsAvailable(device_type_node) and PySpin.IsReadable(device_type_node):
-            if device_type_node.GetCurrentEntry().GetSymbolic() == "GigEVision":
-                is_gige = True
-
-        if is_gige:
-            print("  [GigE] Optimizing GigE Vision parameters...")
-            # Set Packet Size to match Jumbo Frames MTU of 9000
-            node_packet_size = PySpin.CIntegerPtr(nodemap.GetNode("GevSCPSPacketSize"))
-            if PySpin.IsAvailable(node_packet_size) and PySpin.IsWritable(node_packet_size):
-                # Use 9000 or the maximum supported by the camera, whichever is smaller
-                val = min(node_packet_size.GetMax(), 9000)
-                node_packet_size.SetValue(val)
-                print(f"    GevSCPSPacketSize set to {val}")
-            else:
-                print("    GevSCPSPacketSize node NOT writable/available!")
-
-            # Set Packet Delay to pace transmission and prevent drops (e.g. 400)
-            node_packet_delay = PySpin.CIntegerPtr(nodemap.GetNode("GevSCPD"))
-            if PySpin.IsAvailable(node_packet_delay) and PySpin.IsWritable(node_packet_delay):
-                node_packet_delay.SetValue(400)
-                print("    GevSCPD (packet delay) set to 400")
-            else:
-                print("    GevSCPD node NOT writable/available!")
-
-        # Set stream buffer count to a higher value for stability
-        s_node_map = cam.GetTLStreamNodeMap()
-        node_buffer_mode = PySpin.CEnumerationPtr(s_node_map.GetNode("StreamBufferCountMode"))
-        if PySpin.IsAvailable(node_buffer_mode) and PySpin.IsWritable(node_buffer_mode):
-            node_buffer_mode.FromString("Manual")
-            node_buffer_count = PySpin.CIntegerPtr(s_node_map.GetNode("StreamBufferCountNum"))
-            if PySpin.IsAvailable(node_buffer_count) and PySpin.IsWritable(node_buffer_count):
-                node_buffer_count.SetValue(30)
-                print("  [Stream] StreamBufferCountNum set to 30 (expanded for stability)")
-    except Exception as e:
-        print(f"  [Warning] Failed to optimize TL stream parameters: {e}")
 
     return sensor_width, sensor_height
 
@@ -388,8 +387,15 @@ def main():
         last_log_time = time.time()
         
         while True:
-            # Grab frame with a timeout of 1000ms
-            image_result = cam.GetNextImage(1000)
+            try:
+                # Grab frame with a timeout of 2000ms
+                image_result = cam.GetNextImage(2000)
+            except PySpin.SpinnakerException as ex:
+                if "NEW_BUFFER_DATA" in str(ex) or "timeout" in str(ex).lower() or "-1011" in str(ex):
+                    print("[Warning] Timeout waiting for frame from camera, retrying...")
+                    continue
+                else:
+                    raise
 
             if image_result.IsIncomplete():
                 print(f"[Warning] Image incomplete: {image_result.GetImageStatus()}")

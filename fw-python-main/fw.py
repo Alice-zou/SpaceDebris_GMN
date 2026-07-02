@@ -15,6 +15,7 @@ while time.time() - t0 < 5:
 	if good, t0 = 0
 
 '''
+
 class FilterWheel:
 
 	def __init__(self, definition_file):
@@ -62,15 +63,13 @@ class FilterWheel:
 			try:
 				if self.wheel:
 					self.wheel.home()
-					# Check for command completion every 0.5 seconds for 5 seconds before timeout
-					t0 = time.time()
+					# Always check for command completion every 0.5 seconds for a full 5 seconds before returning
 					success = False
-					while time.time() - t0 < 5:
+					for _ in range(10):
 						time.sleep(0.5)
 						if not self.wheel.is_homing:
 							if self.wheel.is_homed:
 								success = True
-								break
 					if not success:
 						raise Exception("Homing timed out after 5 seconds")
 				
@@ -105,15 +104,13 @@ class FilterWheel:
 					try:
 						if self.wheel:
 							self.wheel.move_to_filter(pos_idx + 1)
-							# Check for command completion every 0.5 seconds for 5 seconds before timeout
-							t0 = time.time()
+							# Always check for command completion every 0.5 seconds for a full 5 seconds before returning
 							success = False
-							while time.time() - t0 < 5:
+							for _ in range(10):
 								time.sleep(0.5)
 								if not self.wheel.is_moving:
 									if self.wheel.get_current_filter() == pos_idx + 1:
 										success = True
-										break
 							if not success:
 								raise Exception("Filter wheel movement timed out after 5 seconds")
 								
@@ -134,15 +131,13 @@ class FilterWheel:
 				try:
 					if self.wheel:
 						self.wheel.move_to_filter(pos_idx + 1)
-						# Check for command completion every 0.5 seconds for 5 seconds before timeout
-						t0 = time.time()
+						# Always check for command completion every 0.5 seconds for a full 5 seconds before returning
 						success = False
-						while time.time() - t0 < 5:
+						for _ in range(10):
 							time.sleep(0.5)
 							if not self.wheel.is_moving:
 								if self.wheel.get_current_filter() == pos_idx + 1:
 									success = True
-									break
 						if not success:
 							raise Exception("Filter wheel movement timed out after 5 seconds")
 							

@@ -1,0 +1,420 @@
+""" Selecting and zipping files with detections. """
+
+
+import os
+import shutil
+import sys
+import traceback
+
+
+
+from RMS.Formats.FFfile import validFFName
+from RMS.Logger import getLogger
+from RMS.Misc import archiveDir, tarWithProgress
+from RMS.Routines import MaskImage
+from Utils.GenerateThumbnails import generateThumbnails
+from Utils.StackFFs import stackFFs
+from Utils.LogArchiver import makeLogArchives
+
+
+# Get the logger from the main module
+log = getLogger("rmslogger")
+
+
+def selectFiles(config, dir_path, ff_detected):
+    """ Make a list of all files which should be zipped in the given night directory. 
+    
+        In the list are included:
+            - all TXT files
+            - all FR bin files and their parent FF bin files
+            - all FF bin files with detections
+
+    Arguments:
+        config: [conf object] Configuration.
+        dir_path: [str] Path to the night directory.
+        ff_detected: [list] A list of FF bin file with detections on them.
+
+    Return:
+        selected_files: [list] A list of files selected for compression.
+
+    """
+
+    ### Decide what to upload, given the upload mode ###
+    
+    upload_ffs = True
+    upload_frs = True
+    
+    if config.upload_mode == 2:
+        upload_ffs = False
+
+    elif config.upload_mode == 3:
+        upload_ffs = False
+        upload_frs = False
+
+    elif config.upload_mode == 4:
+        upload_frs = False
+
+    ### ###
+
+
+
+    selected_list = []
+
+    # Go through all files in the night directory
+    for file_name in os.listdir(dir_path):
+
+        # Take all .txt and .csv files
+        if (file_name.lower().endswith('.txt')) or (file_name.lower().endswith('.csv')):
+            selected_list.append(file_name)
+
+
+        # Take all PNG, JPG, BMP images
+        if ('.png' in file_name) or ('.jpg' in file_name) or ('.bmp' in file_name):
+            selected_list.append(file_name)
+
+
+        # Take all field sum files
+        if ('FS' in file_name) and ('fieldsum' in file_name):
+            selected_list.append(file_name)
+
+
+        # Take all FR bin files, and their parent FF bin files
+        if upload_frs and ('FR' in file_name) and ('.bin' in file_name):
+
+            fr_split = file_name.split('_')
+
+            # FR file identifier which it shares with the FF bin file
+            fr_id = '_'.join(fr_split[1:3])
+
+            ff_match = None
+
+            # Locate the parent FF bin file
+            for ff_file_name in os.listdir(dir_path):
+
+                if validFFName(ff_file_name) and (fr_id in ff_file_name):
+                    
+                    ff_match = ff_file_name
+                    break
+
+
+            # Add the FR bin file and it's parent FF file to the list
+            selected_list.append(file_name)
+
+            if ff_match is not None:
+                selected_list.append(ff_match)
+
+
+        # Add FF file which contain detections to the list
+        if upload_ffs and (ff_detected is not None) and (file_name in ff_detected):
+            selected_list.append(file_name)
+
+
+    # Take only the unique elements in the list, sorted by name
+    selected_list = sorted(list(set(selected_list)))
+
+
+    return selected_list
+
+
+
+def archiveFieldsums(dir_path):
+    """ Put all FS fieldsum files in one archive. """
+
+    fieldsum_files = []
+
+    # Find all fieldsum FS files
+    for file_name in os.listdir(dir_path):
+
+        # Take all field sum .bin files
+        if file_name.startswith("FS") and file_name.endswith(".bin") and ('fieldsum' in file_name):
+            fieldsum_files.append(file_name)
+
+
+    # Path to the fieldsum directory
+    fieldsum_archive_dir = os.path.abspath(os.path.join(dir_path, 'Fieldsums'))
+
+
+    # Name of the fieldsum archive
+    fieldsum_archive_name = os.path.join(os.path.abspath(os.path.join(fieldsum_archive_dir, os.pardir)), \
+        'FS_' + os.path.basename(dir_path) + '_fieldsums')
+
+    # Archive all FS files
+    archiveDir(dir_path, fieldsum_files, fieldsum_archive_dir, fieldsum_archive_name, delete_dest_dir=False)
+
+    # Delete FS files in the main directory
+    for fs_file in fieldsum_files:
+        os.remove(os.path.join(dir_path, fs_file))
+
+
+
+
+
+def archiveDetections(captured_path, archived_path, ff_detected, config, extra_files=None):
+    """ Create thumbnails and compress all files with detections and the accompanying files
+        in one archive, suffix _detected
+
+        or
+
+        only the fr*.bin, ff*.fits and extra_files in one archive, suffix _imgdata,
+        and everything apart from fr*.bin and ff*.fits in another archive, suffix _metadata
+
+    Arguments:
+        captured_path: [str] Path where the captured files are located.
+        archived_path: [str] Path where the detected files will be archived to.
+        ff_detected: [str] A list of FF files with detections.
+        config: [conf object] Configuration.
+
+    Keyword arguments:
+        extra_files: [list] A list of extra files (with full paths) which will be saved to the night
+            archive.
+
+    Return:
+        archive_name: [str] Name of the archive where the files were compressed to.
+        imgdata_archive_name: [str] Name of the archive where the images were compressed to.
+        metadata_archive_name: [str] Name of the archive where the metadata was compressed to.
+
+    """
+
+    # Get the list of files to archive
+    file_list = selectFiles(config, captured_path, ff_detected)
+
+    log.info('Generating thumbnails...')
+
+    try:
+
+        # Generate captured thumbnails
+        captured_mosaic_file = generateThumbnails(captured_path, config, 'CAPTURED')
+
+        # Generate detected thumbnails
+        detected_mosaic_file = generateThumbnails(captured_path, config, 'DETECTED', \
+            file_list=sorted(file_list), no_stack=True)
+
+        # Add the detected mosaic file to the selected list
+        file_list.append(captured_mosaic_file)
+        file_list.append(detected_mosaic_file)
+
+    except Exception as e:
+        log.error('Generating thumbnails failed with error:' + repr(e))
+        log.error("".join(traceback.format_exception(*sys.exc_info())))
+
+
+
+    log.info('Generating a stack of all captured images...')
+
+    try:
+
+        # Load the mask for stack
+        mask = None
+        mask_path_default = os.path.join(config.config_file_path, config.mask_file)
+        if os.path.exists(mask_path_default) and config.stack_mask:
+            mask_path = os.path.abspath(mask_path_default)
+            mask = MaskImage.loadMask(mask_path)
+
+
+        # Make a co-added image of all captured images
+        captured_stack_path, _ = stackFFs(captured_path, 'jpg', deinterlace=(config.deinterlace_order > 0), 
+            subavg=True, mask=mask, captured_stack=True)
+
+        if captured_stack_path is not None:
+
+            log.info("Captured stack saved to: {:s}".format(captured_stack_path))
+
+            # Extract the name of the stack image
+            stack_file = os.path.basename(captured_stack_path)
+            
+            # Add the stack path to the list of files to put in the archive
+            file_list.append(stack_file)
+
+        else:
+            log.info("Captured stack could not be saved!")
+
+    except Exception as e:
+        log.error('Generating captured stack failed with error:' + repr(e))
+        log.error("".join(traceback.format_exception(*sys.exc_info())))
+
+
+    log.info('Generating a stack of {:d} detections...'.format(len(ff_detected)))
+
+    try:
+
+        # Make a co-added image of all detections. Filter out possible clouds
+        detected_stack_path, _ = stackFFs(captured_path, 'jpg', deinterlace=(config.deinterlace_order > 0), 
+            subavg=True, filter_bright=True, file_list=sorted(ff_detected), mask=mask)
+
+        if detected_stack_path is not None:
+
+            log.info("Detected stack saved to: {:s}".format(detected_stack_path))
+
+            # Extract the name of the stack image
+            stack_file = os.path.basename(detected_stack_path)
+            
+            # Add the stack path to the list of files to put in the archive
+            file_list.append(stack_file)
+
+        else:
+            log.info("Detected stack could not be saved!")
+
+
+    except Exception as e:
+        log.error('Generating stack failed with error:' + repr(e))
+        log.error("".join(traceback.format_exception(*sys.exc_info())))
+
+    log.info("Generating an archive file of most recent logs...")
+
+    try:
+
+
+        log_archive_path = makeLogArchives(config, captured_path)
+        log.info(f"Log archive saved to: {log_archive_path}")
+        file_list.append(os.path.basename(log_archive_path))
+
+    except Exception as e:
+        log.error('Generating log archives failed with error:' + repr(e))
+        log.error("".join(traceback.format_exception(*sys.exc_info())))
+
+
+
+    if file_list:
+
+        # Create the archive ZIP in the parent directory of the archive directory
+        archive_base = os.path.join(os.path.abspath(os.path.join(archived_path, os.pardir)),
+            os.path.basename(captured_path))
+
+        # Create the imgdata set which is the union of the sets of FF files and FR files
+        imgdata_set = (set([item for item in file_list if item.startswith("FF") and item.endswith(".fits")]) |
+                       set([item for item in file_list if item.startswith("FR") and item.endswith(".bin")]))
+
+        # Create the metadata set which is all the files from _detected excluding the files in imgdata_set,
+        # (*.fits and *.bin)
+
+        metadata_set = set([item for item in file_list if item not in imgdata_set])
+
+        # Create all the required archive names and paths
+        archive_name = f"{archive_base}_detected"
+        metadata_archived_path = f"{archived_path}_metadata"
+        metadata_archive_name = f"{archive_base}_metadata"
+        imgdata_archived_path = f"{archived_path}_imgdata"
+        imgdata_archive_name = f"{archive_base}_imgdata"
+
+        # In all cases, generate the _detected directory and archive as a record for the station
+
+        # Make the archive directory and compress into _detected.tar.bz2 if config.upload_split is False.
+
+        create_detected_tar_bz2 = not config.upload_split
+        archive_name = archiveDir(captured_path, file_list, archived_path, archive_name, extra_files=extra_files,
+                                  create_archive=create_detected_tar_bz2)
+
+        if config.upload_split:
+            # Create a directory to hold the metadata files, archive, then remove the directory
+            metadata_archive_name = archiveDir(captured_path, metadata_set, metadata_archived_path,
+                                               metadata_archive_name, extra_files=extra_files, delete_dest_dir=True)
+
+            # Create a directory to hold the imgdata files, archive, then remove the directory
+            imgdata_archive_name = archiveDir(captured_path, imgdata_set, imgdata_archived_path,
+                                              imgdata_archive_name, extra_files=extra_files, delete_dest_dir=True)
+
+            # Set to archive_name to None to prevent upload from this execution path
+            archive_name = None
+
+        else:
+            # Set to None, as these archives will not be generated in this path
+            imgdata_archive_name, metadata_archive_name = None, None
+
+        return archive_name, imgdata_archive_name, metadata_archive_name
+
+    return None, None, None
+
+
+def archiveFrameTimelapse(frames_root,
+                          video_json_pairs,
+                          remove_source=False):
+    """Tar-up each (mp4, json) pair **without compression**.
+
+    Arguments:
+        frames_root: [str] Directory where the archives will be placed.
+        video_json_pairs: [list[tuple[str, str] | None]] Output from
+            generateTimelapseFromFrameBlocks; each element is either
+            (mp4_path, json_path) or None if that block failed.
+
+    Keyword arguments:
+        remove_source: [bool] If True, delete the mp4 and json after a verified
+            archive is created. False by default.
+
+    Return:
+        archive_paths: [list[str]] Paths of archives successfully created.
+    """
+    archive_paths = []
+
+    for pair in video_json_pairs:
+        if not pair:
+            continue
+
+        mp4_path, json_path = pair
+        if not (os.path.isfile(mp4_path) and os.path.isfile(json_path)):
+            log.warning("Skipping archive: missing file(s) %s  %s",
+                        mp4_path, json_path)
+            continue
+
+        # Build archive name: strip suffix, keep in same root, plain .tar
+        base_name = os.path.basename(mp4_path).replace(".mp4", ".tar")
+        archive_path = os.path.join(frames_root, base_name)
+        tmp_archive = archive_path + ".tmp"
+
+        log.info("Archiving %s and %s to %s",
+                 os.path.basename(mp4_path),
+                 os.path.basename(json_path),
+                 os.path.basename(archive_path))
+
+        try:
+            success = tarWithProgress(
+                None,
+                tmp_archive,
+                None,                  # None = no gzip/bz2 compression for mp4
+                remove_source,
+                file_list=[mp4_path, json_path]
+            )
+
+            if success:
+                if os.path.exists(archive_path):
+                    os.remove(archive_path)
+                os.rename(tmp_archive, archive_path)
+                archive_paths.append(archive_path)
+                log.info("Archive created: %s", archive_path)
+            else:
+                log.warning("Archive verification failed: %s", archive_path)
+                if os.path.exists(tmp_archive):
+                    os.remove(tmp_archive)
+
+        except Exception as exc:
+            log.error("Archiving error for %s: %s", mp4_path, exc)
+            if os.path.exists(tmp_archive):
+                os.remove(tmp_archive)
+
+    return archive_paths
+
+
+
+if __name__ == "__main__":
+
+    import RMS.ConfigReader as cr
+
+    # Load the configuration file
+    config = cr.parse(".config")
+
+
+
+    ### Test the archive function
+
+    # captured_path = "/home/dvida/RMS_data/CapturedFiles/20170903_203323_142567"
+    # archiveFieldsums(captured_path)
+
+    captured_path = "/home/dvida/RMS_data/CapturedFiles/CA0001_20170905_094706_920438"
+
+    archived_path = "/home/dvida/RMS_data/ArchivedFiles/CA0001_20170905_094706_920438"
+
+    ff_detected = ['FF_CA0001_20170905_094707_004_0000000.fits', 'FF_CA0001_20170905_094716_491_0000256.fits']
+
+    archive_name, metadata_name, imgdata_name = archiveDetections(captured_path, archived_path, ff_detected, config)
+
+    print(archive_name, metadata_name, imgdata_name)
+

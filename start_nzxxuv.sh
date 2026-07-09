@@ -4,24 +4,29 @@
 #
 # WHY THIS EXISTS
 #   RMS's own StartCapture.sh does NOT launch the filter wheel: an RMS update overwrote the earlier
-#   in-launcher integration, so starting capture alone never runs filter_cycle.py. This wrapper owns
-#   the coupling instead, so it survives future RMS updates. Run THIS instead of StartCapture.sh:
+#   in-launcher integration, so starting capture alone never runs the filter-wheel scheduler. This
+#   wrapper owns the coupling instead, so it survives future RMS updates. Run THIS instead of
+#   StartCapture.sh:
 #
 #       ~/Desktop/Workspace/start_nzxxuv.sh            # defaults to station NZXXUV
 #       ~/Desktop/Workspace/start_nzxxuv.sh NZXXUV
 #
 # WHAT IT DOES
-#   1. Starts fw-python-main/filter_cycle.py in the background (the whole-night NL-brackets-UV
-#      scheduler), but ONLY for stations listed in FILTERWHEEL_STATIONS (one physical wheel on this Pi).
+#   1. Starts fw-python-main/filter_capture_sync.py in the background (the capture-synced scheduler:
+#      it watches the RMS CapturedFiles night directory and switches the wheel off real FF capture
+#      blocks, default 10:1 UV:Natural Light), but ONLY for stations listed in FILTERWHEEL_STATIONS
+#      (one physical wheel on this Pi). Note: filter_cycle.py (the older wall-clock scheduler) is left
+#      in place but is no longer launched here.
 #   2. Runs RMS capture via StartCapture.sh in the foreground.
-#   3. On exit (capture ends / Ctrl-C), sends SIGINT to the scheduler so it runs its end-calibration
-#      bracket and PARKS the wheel at UV before quitting.
+#   3. On exit (capture ends / Ctrl-C), sends SIGINT to the scheduler so it PARKS the wheel at UV
+#      before quitting.
 #
-# CAVEAT — launch when you are ready to observe (near/after dusk). If StartCapture waits for nightfall,
-#   the wheel's start-calibration burst happens now, not when recording actually begins.
+# CAVEAT — RMS delays star detection / FF processing for ~2 minutes after capture starts, so the first
+#   UV->Natural Light switch happens a couple of minutes into the session, not immediately.
 #
 # ADVANCED / TESTING ENV VARS
-#   FW_ARGS               extra args passed to filter_cycle.py (e.g. "--simulate --uv-frames 10 --check-frames 1")
+#   FW_ARGS               extra args passed to filter_capture_sync.py
+#                         (e.g. "--simulate --simulate-ff 2 --uv-events 10 --nl-events 1")
 #   NZXXUV_CAPTURE_CMD    override the capture command (used by the test harness; default = real RMS)
 
 set -u
@@ -32,8 +37,8 @@ STATION="${1:-NZXXUV}"
 FILTERWHEEL_STATIONS="${FILTERWHEEL_STATIONS:-NZXXUV}"
 
 WORKSPACE="$HOME/Desktop/Workspace"
-FW_SCRIPT="$WORKSPACE/fw-python-main/filter_cycle.py"
-VENV_PY="$HOME/vRMS/bin/python"                                   # filter_cycle runs in the vRMS venv
+FW_SCRIPT="$WORKSPACE/fw-python-main/filter_capture_sync.py"
+VENV_PY="$HOME/vRMS/bin/python"                                   # scheduler runs in the vRMS venv
 CAPTURE_CMD="${NZXXUV_CAPTURE_CMD:-$HOME/source/RMS/Scripts/MultiCamLinux/StartCapture.sh}"
 
 fw_pid=""
@@ -46,7 +51,8 @@ station_has_wheel() {
     esac
 }
 
-# start_filterwheel — launch filter_cycle.py in the background, logging to the RMS logs dir.
+# start_filterwheel — launch filter_capture_sync.py in the background, logging to the RMS logs dir.
+# (The scheduler also writes its own dedicated log at ~/RMS_data/filter_capture_sync.log.)
 start_filterwheel() {
     if ! station_has_wheel; then
         echo "Filter wheel not enabled for $STATION (FILTERWHEEL_STATIONS='$FILTERWHEEL_STATIONS'); skipping."
@@ -64,12 +70,12 @@ start_filterwheel() {
     echo "  $log"
 }
 
-# stop_filterwheel — ask the scheduler to shut down cleanly (end-calibration bracket + park at UV).
+# stop_filterwheel — ask the scheduler to shut down cleanly (stop watching + park at UV).
 # Runs from the EXIT trap, so the wheel is always parked no matter how capture ends.
 stop_filterwheel() {
     if [[ -n "$fw_pid" ]] && kill -0 "$fw_pid" 2>/dev/null; then
         echo "Stopping filter wheel scheduler (PID $fw_pid); parking wheel at UV..."
-        kill -INT "$fw_pid" 2>/dev/null   # SIGINT -> end-calibration bracket, then park, then exit
+        kill -INT "$fw_pid" 2>/dev/null   # SIGINT -> stop watching, park the wheel, then exit
         wait "$fw_pid" 2>/dev/null
     fi
 }

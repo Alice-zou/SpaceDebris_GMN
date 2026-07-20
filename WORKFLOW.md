@@ -34,9 +34,8 @@ filter wheel integration, and the "detect meteors in UV even with no stars" logi
         ~/RMS_data/NZXXUV/{CapturedFiles,ArchivedFiles,FramesFiles,TimeFiles,logs}
 ```
 
-**Two stations share this Pi.** `NZ0071` (normal light) and `NZXXUV` (UV). Only **NZXXUV** has the
-filter wheel and the UV detection behaviour. Config files are reachable as Desktop shortcuts:
-`~/Desktop/NZ0071.config` and `~/Desktop/NZXXUV.config`.
+**One station runs on this Pi:** `NZXXUV` (UV), which has the filter wheel and the UV detection
+behaviour. Its config is reachable as the Desktop shortcut `~/Desktop/NZXXUV.config`.
 
 ---
 
@@ -48,11 +47,10 @@ filter wheel and the UV detection behaviour. Config files are reachable as Deskt
 | RTSP launcher | `~/Desktop/Workspace/RTSP/start_spinnaker_rtsp.sh` | bash |
 | RTSP server | `~/Desktop/Workspace/Mediamtx/mediamtx` (+ `mediamtx.yml`) | binary |
 | RMS capture code | `~/source/RMS` → symlink → `~/Desktop/Workspace/RMS` | **vRMS** venv (3.13) |
-| NZXXUV combined launcher (wheel + capture) | `~/Desktop/Workspace/start_nzxxuv.sh` | bash |
+| NZXXUV launcher | `~/Desktop/Workspace/start_nzxxuv.sh` | bash |
 | RMS capture launcher (called by the wrapper) | `RMS/Scripts/MultiCamLinux/StartCapture.sh` | bash |
 | NZXXUV config (active) | `~/source/Stations/NZXXUV/.config` (= `~/Desktop/NZXXUV.config`) | — |
-| NZ0071 config (active) | `~/Desktop/Workspace/RMS/.config` (= `~/Desktop/NZ0071.config`) | — |
-| Filter wheel cycler | `~/Desktop/Workspace/fw-python-main/filter_cycle.py` | **vRMS** venv (3.13) |
+| Filter wheel control (in-capture) | `RMS/RMS/BufferedCapture.py` → `fw-python-main/fw.py` | **vRMS** venv (3.13) |
 | Filter wheel driver classes | `fw-python-main/{fw,hsfw,ifw}.py` + `definition_file.csv` | — |
 | Filter history log | `~/RMS_data/filter_history.txt` | written by filter_cycle |
 | Detection logic | `RMS/RMS/DetectStarsAndMeteors.py` | vRMS venv |
@@ -350,15 +348,14 @@ autostart .desktop → ~/Desktop/RMS_FirstRun.sh  (autorun flag = 1 → self-upd
    → ~/Desktop/RMS_StartCapture.sh   (symlink, now points at ↓)
      → ~/Desktop/Workspace/boot_start_all.sh   (local orchestrator, outside the RMS repo)
          1. start Spinnaker→RTSP stream, then WAIT for :8554 to come up
-            (this also lets eth0 settle at MTU 9000 before NZ0071 connects)
-         2. NZ0071  → StartCapture.sh NZ0071        (plain capture, separate IP camera)
-         3. NZXXUV  → start_nzxxuv.sh NZXXUV         (filter wheel + capture via the wrapper)
+            (this also lets eth0 settle at MTU 9000)
+         2. NZXXUV  → start_nzxxuv.sh NZXXUV         (capture; the wheel is driven inside capture)
 ```
 
 **Why the orchestrator exists:** the stock RMS multi-cam launcher (`RMS_StartCapture_MCP.sh`) loops
 every station in `~/source/Stations/*` with plain `StartCapture.sh`, which for NZXXUV would (a) never
 start its RTSP video source and (b) never start the filter wheel. `boot_start_all.sh` fixes both and
-lives **outside** the RMS repo so RMS updates can't overwrite it. NZ0071 is untouched.
+lives **outside** the RMS repo so RMS updates can't overwrite it.
 
 - The change is just a repointed symlink: `~/Desktop/RMS_StartCapture.sh → boot_start_all.sh`.
 - **To revert to stock behaviour:** `ln -sfn "$(cat ~/Desktop/Workspace/.RMS_StartCapture.sh.orig-target)" ~/Desktop/RMS_StartCapture.sh`
@@ -410,7 +407,7 @@ Success = `Detected stars: <under 20>` followed by `detecting meteors` / `UV fil
 | Filter wheel **auto-starts with NZXXUV capture** via a wrapper (gated per station; survives RMS updates) | `~/Desktop/Workspace/start_nzxxuv.sh` |
 | **Uploads disabled** to GMN server | `~/source/Stations/NZXXUV/.config` (`upload_enabled: false`) |
 | Location set to **Lisbon** | `~/source/Stations/NZXXUV/.config` (lat/lon/elev) |
-| **Desktop shortcuts** to the two live configs; removed duplicate copies | `~/Desktop/NZ0071.config`, `~/Desktop/NZXXUV.config` |
+| **Desktop shortcut** to the live config; removed duplicate copies | `~/Desktop/NZXXUV.config` |
 
 *Last verified end-to-end on 2026-07-06 by running the real StartCapture and reprocessing 6 captured
 FF files: `detecting meteors` printed to the terminal for UV frames with 5–6 stars (below the 20

@@ -18,17 +18,30 @@ while time.time() - t0 < 5:
 
 class FilterWheel:
 
-	def __init__(self, definition_file):
+	# Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+	# The UV:visible cadence now comes from the RMS config file (Capture/num_uv_measurements and
+	# Capture/num_vis_measurements) and is passed in here. The defaults below match what used to be
+	# hardcoded, so callers that do not pass a cadence (filter_cycle.py, fw_test.py) are unaffected.
+	def __init__(self, definition_file, num_uv_measurements=3, num_vis_measurements=2):
 		self.last_command: str = ""  # may not be useful
 		self.last_response: str = "" # may not be useful
 		self.timeout:       int = 2
 		self.retries:       int = 3
-		self.last_error: str = "" 
+		self.last_error: str = ""
 		self.wheel = None
 		self.init = False
 		self.filter_list: list = []
 		self.position_num: int = 0
 		self.position_name: str = ""
+		self.num_uv_measurements  = max(1, int(num_uv_measurements))
+		self.num_vis_measurements = max(1, int(num_vis_measurements))
+		self.num_uv_counter  = 0
+	# End Robinson Space Debris
+		
+	#	f = file('/home/rms/Desktop/filter_wheel_last_init.txt', 'w')
+	#	f.write(time.time())
+	#	f.close()
+		
 		
 		try:
 			df = pd.read_csv(definition_file, dtype=str)
@@ -57,7 +70,32 @@ class FilterWheel:
 		except Exception as e:
 			self.init = False
 			self.last_error = f"ERROR: Initialization failed: {e}"
-		
+
+	def check_in(self):
+#		if log_file_path[-1] != '/':
+#			log_file_path = log_file_path + '/'
+		log_file_path = '/home/rms/Desktop/filter_wheel.csv'
+		# Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+		# Was "self.self.position_name" (AttributeError) and "/n" instead of a newline.
+		with open(log_file_path, 'a') as f:
+			f.write(str(time.time()) + ', ' + str(self.position_name) + '\n')
+		# End Robinson Space Debris
+
+		# Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+		# The measurement just logged above counts towards the active filter's quota, so the switch
+		# fires once the quota is reached (">=", not ">"): num_uv_measurements: 3 now yields exactly
+		# 3 UV rows per cycle. The old ">" gave one extra block in each filter.
+		self.num_uv_counter += 1
+		if self.position_name == 'UV':
+			if self.num_uv_counter >= self.num_uv_measurements:
+				self.num_uv_counter = 0
+				self.set_position('Open')
+		else:
+			if self.num_uv_counter >= self.num_vis_measurements:
+				self.num_uv_counter = 0
+				self.set_position('UV')
+		# End Robinson Space Debris
+
 	def home(self):
 		if self.init:
 			try:

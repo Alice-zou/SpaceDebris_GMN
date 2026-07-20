@@ -280,6 +280,19 @@ class Config:
         self.external_script_path = None
         self.external_function_name = "rmsExternal"
 
+        # Robinson Space Debris edit 7/17/2026 start
+        self.filterwheel = False
+        # Robinson Space Debris edit 7/17/2026 end
+
+        # Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+        # Filter wheel cadence: how many consecutive capture blocks are measured in each filter
+        # before the wheel moves to the other one. Passed to fw.FilterWheel at initialization.
+        # Defaults reproduce the cadence that was hardcoded in fw.py (3 UV : 2 visible).
+        self.num_uv_measurements = 3
+        self.num_vis_measurements = 2
+        # End Robinson Space Debris
+
+
         self.reboot_after_processing = False
         self.reboot_lock_file = ".reboot_lock"
         
@@ -903,6 +916,14 @@ def parseSystem(config, parser):
     except NoOptionError:
         raise RuntimeError("Not configured!")
 
+    # Robinson Space Debris edit 7/17/2026 start
+    if parser.has_option(section, "filterwheel"):
+        config.filterwheel = parser.getboolean(section, "filterwheel")
+    else:
+        config.filterwheel = False
+    # Robinson Space Debris edit 7/17/2026 end
+
+
 
     if parser.has_option(section, "latitude"):
         config.latitude = parser.getfloat(section, "latitude")
@@ -974,9 +995,36 @@ def parseSystem(config, parser):
 
 def parseCapture(config, parser):
     section = "Capture"
-    
+
     if not parser.has_section(section):
         return
+
+    # Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+    # Is a filter wheel installed on this station? This is the switch that gates all filter wheel
+    # code in BufferedCapture, so a station without a wheel never imports or touches fw.py.
+    # parseSystem runs before parseCapture and also looks for a "filterwheel" key in [System];
+    # whichever key is present wins, and this one wins if both are.
+    if parser.has_option(section, "filterwheel_detected"):
+        config.filterwheel = parser.getboolean(section, "filterwheel_detected")
+
+    # Filter wheel cadence, given as a ratio of capture blocks measured per filter. These are read
+    # here (next to filterwheel_detected) and handed to fw.FilterWheel when the wheel is opened.
+    # Values below 1 are meaningless (they would flip the wheel on every block), so clamp to 1.
+    if parser.has_option(section, "num_uv_measurements"):
+        config.num_uv_measurements = max(1, parser.getint(section, "num_uv_measurements"))
+
+    if parser.has_option(section, "num_vis_measurements"):
+        config.num_vis_measurements = max(1, parser.getint(section, "num_vis_measurements"))
+
+    # Capture block wall-clock alignment, in seconds. BufferedCapture sleeps at the end of a block
+    # until the next whole multiple of this value, so blocks start on aligned boundaries.
+    #
+    # Deliberately NOT given a default in Config.__init__: the capture loop guards this with
+    # hasattr(self.config, 'time_sync'), so the attribute exists only on stations that actually ask
+    # for it in their config file, and every other station skips the sleep entirely.
+    if parser.has_option(section, "time_sync"):
+        config.time_sync = parser.getfloat(section, "time_sync")
+    # End Robinson Space Debris
 
     if parser.has_option(section, "data_dir"):
         

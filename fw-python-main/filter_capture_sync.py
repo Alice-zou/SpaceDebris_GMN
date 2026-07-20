@@ -36,7 +36,7 @@ USAGE
     python3 filter_capture_sync.py
 
     # Restrict to one station's capture dirs and use a 10:1 cadence explicitly:
-    python3 filter_capture_sync.py --station-id NZ0071 --uv-events 10 --nl-events 1
+    python3 filter_capture_sync.py --station-id NZXXUV --uv-events 10 --nl-events 1
 
     # Rehearse with NO hardware and NO capture running: fake an FF block every 2 s (sped up):
     python3 filter_capture_sync.py --simulate --simulate-ff 2

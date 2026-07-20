@@ -16,6 +16,10 @@
 
 from __future__ import print_function, division, absolute_import
 
+# Note: the conditional "import math" for the time sync logic lives at its use site in
+# saveCurrentBlock(), not here. At module scope there is no self/config to test, so the guard can
+# only be evaluated inside the method that has one.
+
 import gc
 import os
 import sys
@@ -39,7 +43,6 @@ import socket
 import errno
 import json
 
-
 from RMS.Misc import obfuscatePassword
 from RMS.Routines.GstreamerCapture import GstVideoFile, getStructureValue
 from RMS.Formats.ObservationSummary import getObsDBConn, addObsParam
@@ -52,6 +55,80 @@ import Utils.CameraControl as cc
 
 # Get the logger from the main module
 log = getLogger("rmslogger")
+
+# Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+
+FW_MODULE_DIR = '/home/rms/Desktop/Workspace/fw-python-main'
+FW_DEFINITION_FILE = os.path.join(FW_MODULE_DIR, 'definition_file.csv')
+
+# The wheel must NOT be opened at import time. BufferedCapture is imported by the parent
+# process before the capture Process is forked, so a module-level FilterWheel() would home
+# the wheel on every import and leave the serial handle shared between parent and child.
+# Open it lazily, once, inside whichever process actually calls check_in().
+filter_wheel = None
+
+
+def filterWheelEnabled(config):
+    """ Is this station configured with a filter wheel?
+
+    Gates every piece of filter wheel code below. Read defensively with getattr: a config object
+    produced by an older ConfigReader (or by anything that builds a Config by hand) has no
+    'filterwheel' attribute at all, and a missing attribute must mean "no wheel", not a crash.
+
+    Arguments:
+        config: [Config] RMS config.
+
+    Return:
+        [bool] True if a filter wheel is installed on this station.
+    """
+
+    return bool(getattr(config, 'filterwheel', False))
+
+
+def getFilterWheel(config):
+    """ Return the process-local FilterWheel instance, opening it on first use.
+
+    Arguments:
+        config: [Config] RMS config, read for the UV:visible measurement cadence.
+
+    Return:
+        [FilterWheel or None] The wheel, or None if it could not be opened, or if this station has
+            no filter wheel configured.
+    """
+
+    global filter_wheel
+
+    # No wheel on this station: never import fw.py, never touch the serial port. fw.py imports
+    # hsfw/ifw/pandas and lives outside the RMS tree, so on a station without a wheel that import
+    # would fail (or worse, succeed and probe the serial port).
+    if not filterWheelEnabled(config):
+        return None
+
+    if filter_wheel is None:
+        log.info('Opening filter wheel connection ({} UV : {} visible measurements)...'.format(
+            config.num_uv_measurements, config.num_vis_measurements))
+
+        try:
+            # The wheel driver lives outside the RMS tree, so put it on the path only now that we
+            # know this station actually has a wheel.
+            if FW_MODULE_DIR not in sys.path:
+                sys.path.append(FW_MODULE_DIR)
+
+            import fw
+            filter_wheel = fw.FilterWheel(FW_DEFINITION_FILE,
+                                          num_uv_measurements=config.num_uv_measurements,
+                                          num_vis_measurements=config.num_vis_measurements)
+
+        except Exception as e:
+            log.error('Could not open the filter wheel: {}'.format(e))
+            return None
+
+        if not filter_wheel.init:
+            log.error('Filter wheel failed to initialize: {}'.format(filter_wheel.last_error))
+
+    return filter_wheel
+
+# End Robinson Space Debris
 
 if sys.version_info[0] < 3:
     # py2
@@ -2307,6 +2384,52 @@ class BufferedCapture(Process):
                 FTfile.write(ft, ft_subpath, ft_filename)
                 log.debug("Created FT file {} for block starting at {}".format(os.path.join(ft_subpath, ft_filename), first_frame_timestamp))
 
+                # Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+                # Nudge the filter wheel once per FT block, but only on stations that have one.
+                # A wheel problem must never take down capture, so every call is guarded.
+                if filterWheelEnabled(self.config):
+
+                    log.debug('Trying to talk to filter wheel')
+
+                    wheel = getFilterWheel(self.config)
+
+                    if wheel is not None:
+                        try:
+                            wheel.check_in()
+                            log.debug('Filter wheel checked in, position: {}'.format(
+                                wheel.position_name))
+
+                        except Exception as e:
+                            log.error('Filter wheel check-in failed: {}'.format(e))
+                # End Robinson Space Debris
+
+
+                # Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
+                # Time sync logic: sleep until the next whole multiple of time_sync seconds so
+                # that each buffer session starts on an aligned wall clock boundary.
+                if hasattr(self.config, 'time_sync'):
+
+                    # Only this block needs math, so import it only on stations that time sync.
+                    import math
+
+                    if self.config.time_sync > 0:
+
+                        time_now = time.time()
+                        next_time = self.config.time_sync*math.ceil(time_now/self.config.time_sync)
+                        sleep_duration = next_time - time_now
+
+                        log.info('Sleeping for {:.2f} seconds before starting next buffer session.'.format(
+                            sleep_duration))
+                        time.sleep(sleep_duration)
+
+                    else:
+                        log.warning('time_sync variable is set to <= 0 and will be ignored. Value in '
+                                    'the config file is: {}'.format(self.config.time_sync))
+                # End Robinson Space Debris
+
+                # End Robinson Space Debris
+
+
                 # For Testing: 
                 # Print first and last 10 timestamps, array length, average time difference and time difference from last block
                 # Enable self.ft_test_time in __init__
@@ -2321,7 +2444,7 @@ class BufferedCapture(Process):
                 #       ft.timestamps[0][1] - self.ft_test_time
                 # ), end='')
                 # self.ft_test_time = ft.timestamps[-1][1]
-
+                
 
         log.info('Releasing video device...')
         self.releaseResources()

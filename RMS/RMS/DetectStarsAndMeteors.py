@@ -95,8 +95,10 @@ def detectStarsAndMeteorsFrameInterface(
     # Rewind the video to the beginning
     img_handle.setFrame(0)
 
-    # Run meteor detection if there are enough stars on the image
-    if max_stars >= config.ff_min_stars:
+    # Robinson Space Debris edit 7/17/2026 start
+    if max_stars >= config.ff_min_stars or getattr(config, 'filterwheel', False):
+    # Robinson Space Debris edit 7/17/2026 end
+
             
         log.debug('At least ' + str(config.ff_min_stars) + ' stars, detecting meteors...')
         
@@ -231,8 +233,10 @@ def detectStarsAndMeteors(ff_directory, ff_name, config, flat_struct=None, dark=
     log.info('Detected stars: ' + str(len(star_list[1])))
 
 
-    # Run meteor detection if there are enough stars on the image
-    if len(star_list[1]) >= config.ff_min_stars:
+    # Robinson Space Debris edit 7/17/2026 start
+    if len(star_list[1]) >= config.ff_min_stars or getattr(config, 'filterwheel', False):
+    # Robinson Space Debris edit 7/17/2026 end
+
 
         log.info('At least ' + str(config.ff_min_stars) + ' stars, detecting meteors...')
 

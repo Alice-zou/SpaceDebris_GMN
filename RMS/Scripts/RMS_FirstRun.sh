@@ -50,10 +50,13 @@ else
   AUTORUNSTATUS=$(cat $RMSAUTORUNFILE)
 
   if [ "$AUTORUNSTATUS" = "1" ]; then
+    # Robinson Space Debris edit 2026-07-16 start
+    # echo ""
+    # echo "Updating to the latest version of RMS..."
+    # bash $RMSUPDATESCRIPT
 
-    echo ""
-    echo "Updating to the latest version of RMS..."
-    bash $RMSUPDATESCRIPT
+    echo "WARNING - not running RMSUPDATESCIPT per RMS_FirstRun.sh (line ~58)"
+    # Robinson Space Debris edit 2026-07-16 end
 
     # If the configuration was done, run recording
     bash $RMSSTARTCAPTURE

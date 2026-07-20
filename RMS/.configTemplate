@@ -28,6 +28,12 @@ elevation: 327
 ; Should be set only if full CAMS compatibility is desired
 cams_code: 0
 
+; Robinson Space Debris edit 7/17/2026 start
+; Enable the Optec filter wheel control thread inside BufferedCapture
+filterwheel: false
+; Robinson Space Debris edit 7/17/2026 end
+
+
 ; Weblog and PerfMonitor
 ; ----------------------
 

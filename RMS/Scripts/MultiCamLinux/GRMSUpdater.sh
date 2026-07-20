@@ -1,4 +1,4 @@
-#!/bin/bash
+g#!/bin/bash
 
 # This software is part of the Linux port of RMS
 # Copyright (C) 2023  Ed Harman

@@ -1,5 +1,6 @@
-import ifw 
+import ifw
 import hsfw
+import datetime
 import time
 import copy
 import fw_test
@@ -77,8 +78,12 @@ class FilterWheel:
 		log_file_path = '/home/rms/Desktop/filter_wheel.csv'
 		# Begin Robinson Space Debris edit 2026-07-20 by Alice Zou
 		# Was "self.self.position_name" (AttributeError) and "/n" instead of a newline.
+		# Timestamp is a naive UTC ISO string (no offset), matching the capture frame timestamps and
+		# the history log written by filter_cycle.record_filter(). Computed via a timezone-aware value
+		# to avoid the deprecated utcnow().
+		timestamp = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
 		with open(log_file_path, 'a') as f:
-			f.write(str(time.time()) + ', ' + str(self.position_name) + '\n')
+			f.write(timestamp + ', ' + str(self.position_name) + '\n')
 		# End Robinson Space Debris
 
 		# Begin Robinson Space Debris edit 2026-07-20 by Alice Zou

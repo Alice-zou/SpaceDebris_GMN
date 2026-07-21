@@ -1,0 +1,529 @@
+<title>NZXXUV UV Meteor Pipeline</title>
+<style>
+  :root {
+    /* light theme (default) */
+    --bg: #f6f4fc;
+    --surface: #ffffff;
+    --surface-2: #f1ecfb;
+    --border: #e4ddf4;
+    --border-strong: #d3c8ee;
+    --ink: #1b1730;
+    --ink-soft: #3d3760;
+    --muted: #6d6592;
+    --accent: #6a43ef;      /* ultraviolet */
+    --accent-soft: #efe9ff;
+    --amber: #b9781a;       /* natural light */
+    --amber-soft: #fbf0dc;
+    --green: #1c9a5c;       /* stored data */
+    --green-soft: #e0f4ea;
+    --red: #cf3e57;         /* gotchas */
+    --red-soft: #fbe4e8;
+    --shadow: 0 1px 2px rgba(27,23,48,.05), 0 8px 30px rgba(27,23,48,.06);
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0a17;
+      --surface: #161226;
+      --surface-2: #1e1934;
+      --border: #2a2444;
+      --border-strong: #392f5a;
+      --ink: #ece9f8;
+      --ink-soft: #c8c2e0;
+      --muted: #9d95bd;
+      --accent: #9d82ff;
+      --accent-soft: #221b3e;
+      --amber: #f0ac54;
+      --amber-soft: #2c2213;
+      --green: #5ccd8e;
+      --green-soft: #12271c;
+      --red: #ff7089;
+      --red-soft: #2c1620;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 40px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f4fc; --surface: #ffffff; --surface-2: #f1ecfb; --border: #e4ddf4;
+    --border-strong: #d3c8ee; --ink: #1b1730; --ink-soft: #3d3760; --muted: #6d6592;
+    --accent: #6a43ef; --accent-soft: #efe9ff; --amber: #b9781a; --amber-soft: #fbf0dc;
+    --green: #1c9a5c; --green-soft: #e0f4ea; --red: #cf3e57; --red-soft: #fbe4e8;
+    --shadow: 0 1px 2px rgba(27,23,48,.05), 0 8px 30px rgba(27,23,48,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0a17; --surface: #161226; --surface-2: #1e1934; --border: #2a2444;
+    --border-strong: #392f5a; --ink: #ece9f8; --ink-soft: #c8c2e0; --muted: #9d95bd;
+    --accent: #9d82ff; --accent-soft: #221b3e; --amber: #f0ac54; --amber-soft: #2c2213;
+    --green: #5ccd8e; --green-soft: #12271c; --red: #ff7089; --red-soft: #2c1620;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 40px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 22px 80px; }
+
+  /* ---------- header ---------- */
+  header { padding: 64px 0 34px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before {
+    content: ""; width: 26px; height: 2px; background: var(--accent); display: inline-block;
+  }
+  h1 {
+    font-size: clamp(2.1rem, 5vw, 3.2rem); line-height: 1.04; margin: 18px 0 10px;
+    letter-spacing: -0.03em; font-weight: 700; text-wrap: balance;
+  }
+  h1 .uv { color: var(--accent); }
+  .lede { font-size: 1.14rem; color: var(--ink-soft); max-width: 68ch; margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .chip {
+    font-family: var(--font-mono); font-size: 12px; padding: 6px 11px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border); color: var(--ink-soft);
+    display: inline-flex; gap: 7px; align-items: center;
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 54px; }
+  .sec-label {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px;
+  }
+  h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0 0 14px; font-weight: 680; text-wrap: balance; }
+  h3 { font-size: 1.12rem; letter-spacing: -0.01em; margin: 26px 0 8px; font-weight: 640; }
+  p { max-width: 70ch; }
+  a { color: var(--accent); }
+  code {
+    font-family: var(--font-mono); font-size: .86em; background: var(--surface-2);
+    border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: var(--ink);
+    word-break: break-word;
+  }
+
+  /* ---------- flowchart ---------- */
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: var(--shadow); padding: 20px; overflow-x: auto;
+  }
+  .chart-card svg { min-width: 720px; width: 100%; height: auto; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px 22px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .legend span { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); }
+  .swatch { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid; display: inline-block; }
+
+  /* svg node styles (themeable via currentColor tokens) */
+  .n-rect { fill: var(--surface-2); stroke: var(--border-strong); stroke-width: 1.5; }
+  .n-main { fill: var(--accent-soft); stroke: var(--accent); }
+  .n-fw   { fill: var(--amber-soft); stroke: var(--amber); }
+  .n-store{ fill: var(--green-soft); stroke: var(--green); }
+  .n-chip { fill: var(--surface); stroke: var(--border-strong); stroke-dasharray: 4 3; }
+  .n-title { font-family: var(--font-mono); font-size: 13px; fill: var(--ink); font-weight: 600; }
+  .n-sub   { font-family: var(--font-sans); font-size: 10.5px; fill: var(--muted); }
+  .n-chip-t{ font-family: var(--font-mono); font-size: 11.5px; fill: var(--ink-soft); }
+  .e-line  { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+  .e-fw    { stroke: var(--amber); stroke-width: 1.6; fill: none; }
+  .e-dash  { stroke-dasharray: 5 4; }
+  .e-lbl   { font-family: var(--font-mono); font-size: 10px; fill: var(--muted); }
+  .e-lbl-fw{ font-family: var(--font-mono); font-size: 10px; fill: var(--amber); }
+
+  /* ---------- tables ---------- */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; min-width: 520px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { background: var(--surface-2); font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code { font-size: .82em; }
+  .mono { font-family: var(--font-mono); }
+
+  /* ---------- steps ---------- */
+  .steps { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 640px) { .steps { grid-template-columns: 1fr; } }
+  .step {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 18px 6px; box-shadow: var(--shadow);
+  }
+  .step .num { font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 600; letter-spacing: .1em; }
+  .step h3 { margin: 6px 0 4px; }
+
+  /* ---------- code block ---------- */
+  pre {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px;
+    line-height: 1.55; color: var(--ink); margin: 12px 0;
+  }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--accent); }
+
+  /* ---------- callouts ---------- */
+  .callout {
+    border: 1px solid var(--border); border-left: 3px solid var(--muted); border-radius: 10px;
+    padding: 13px 16px; margin: 16px 0; background: var(--surface); font-size: .95rem;
+  }
+  .callout.warn { border-left-color: var(--red); background: var(--red-soft); }
+  .callout.info { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout.ok   { border-left-color: var(--green); background: var(--green-soft); }
+  .callout b { font-weight: 650; }
+  .callout .tag { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; display: block; margin-bottom: 3px; }
+  .warn .tag { color: var(--red); }
+  .info .tag { color: var(--accent); }
+  .ok .tag   { color: var(--green); }
+
+  footer { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--border); color: var(--muted); font-size: .88rem; font-family: var(--font-mono); }
+
+  ::selection { background: var(--accent); color: #fff; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Raspberry Pi 5 &middot; GMN Meteor Station</div>
+    <h1>The <span class="uv">NZXXUV</span> ultraviolet meteor pipeline</h1>
+    <p class="lede">From camera photons to archived detections — how the RTSP stream, RMS capture, the
+      Optec filter wheel, and the custom UV detection logic fit together on this machine.</p>
+    <div class="chips">
+      <span class="chip"><span class="dot" style="background:var(--accent)"></span> Location <b>Lisbon</b></span>
+      <span class="chip"><span class="dot" style="background:var(--muted)"></span> Camera <b>FLIR / Spinnaker</b></span>
+      <span class="chip"><span class="dot" style="background:var(--amber)"></span> Filter <b>UV &harr; Natural Light</b></span>
+      <span class="chip"><span class="dot" style="background:var(--green)"></span> Uploads <b>disabled</b></span>
+    </div>
+  </header>
+
+  <!-- ============ FLOWCHART ============ -->
+  <section>
+    <div class="sec-label">File &amp; data flow</div>
+    <h2>Every file, and how it connects</h2>
+    <p>Solid arrows are program flow; dashed arrows are files being read. The <b style="color:var(--amber)">amber</b>
+      path is the filter wheel — its <code>filter_history.txt</code> is the bridge that tells detection which
+      filter was in place for each frame.</p>
+
+    <div class="chart-card">
+      <svg viewBox="0 0 1000 712" role="img" aria-label="Flowchart of the NZXXUV capture and detection pipeline connecting all files">
+        <defs>
+          <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+          </marker>
+          <marker id="arwA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--amber)"/>
+          </marker>
+        </defs>
+
+        <!-- ===== edges (drawn first, under nodes) ===== -->
+        <!-- rtsp stage -->
+        <path class="e-line" d="M268,46 L382,52" marker-end="url(#arw)"/>
+        <path class="e-line e-dash" d="M268,92 L382,70" marker-end="url(#arw)"/>
+        <path class="e-line" d="M500,84 L500,126" marker-end="url(#arw)"/>
+        <!-- launch stage -->
+        <path class="e-line e-dash" d="M170,191 L170,224" marker-end="url(#arw)"/>
+        <path class="e-line" d="M500,172 L500,224" marker-end="url(#arw)"/>
+        <path class="e-line" d="M288,250 L382,250" marker-end="url(#arw)"/>
+        <path class="e-line" d="M618,250 L712,250" marker-end="url(#arw)"/>
+        <!-- filter wheel branch (amber) -->
+        <path class="e-fw" d="M170,276 L170,334" marker-end="url(#arwA)"/>
+        <path class="e-fw" d="M170,386 L170,429" marker-end="url(#arwA)"/>
+        <!-- reprocess spine -->
+        <path class="e-line" d="M500,276 L500,429" marker-end="url(#arw)"/>
+        <path class="e-fw e-dash" d="M288,455 L382,455" marker-end="url(#arwA)"/>
+        <path class="e-line" d="M618,455 L712,455" marker-end="url(#arw)"/>
+        <path class="e-line" d="M500,481 L500,534" marker-end="url(#arw)"/>
+        <path class="e-line" d="M618,560 L712,560" marker-end="url(#arw)"/>
+        <path class="e-line" d="M500,586 L500,634" marker-end="url(#arw)"/>
+        <path class="e-line" d="M618,660 L712,660" marker-end="url(#arw)"/>
+
+        <!-- edge labels -->
+        <text class="e-lbl" x="286" y="36" text-anchor="middle">launches</text>
+        <text class="e-lbl" x="290" y="98" text-anchor="middle">reads</text>
+        <text class="e-lbl" x="510" y="110" text-anchor="start">via mediamtx</text>
+        <text class="e-lbl" x="182" y="211" text-anchor="start">reads</text>
+        <text class="e-lbl" x="510" y="202" text-anchor="start">reads stream</text>
+        <text class="e-lbl" x="335" y="242" text-anchor="middle">launches</text>
+        <text class="e-lbl" x="665" y="242" text-anchor="middle">writes</text>
+        <text class="e-lbl-fw" x="182" y="308" text-anchor="start">launches</text>
+        <text class="e-lbl-fw" x="182" y="411" text-anchor="start">records</text>
+        <text class="e-lbl" x="512" y="358" text-anchor="start">at dawn</text>
+        <text class="e-lbl-fw" x="335" y="447" text-anchor="middle">looks up filter</text>
+        <text class="e-lbl" x="665" y="447" text-anchor="middle">writes</text>
+        <text class="e-lbl" x="665" y="552" text-anchor="middle">writes</text>
+        <text class="e-lbl" x="665" y="652" text-anchor="middle">archives</text>
+
+        <!-- ===== nodes ===== -->
+        <!-- chips (inputs) -->
+        <g><rect class="n-rect n-chip" x="72" y="30" width="196" height="32" rx="8"/>
+           <text class="n-chip-t" x="170" y="50" text-anchor="middle">start_spinnaker_rtsp.sh</text></g>
+        <g><rect class="n-rect n-chip" x="72" y="76" width="196" height="32" rx="8"/>
+           <text class="n-chip-t" x="170" y="96" text-anchor="middle">spinnaker.config</text></g>
+        <g><rect class="n-rect n-chip" x="72" y="159" width="196" height="32" rx="8"/>
+           <text class="n-chip-t" x="170" y="179" text-anchor="middle">NZXXUV/.config</text></g>
+
+        <!-- A spinnaker_to_rtsp -->
+        <g><rect class="n-rect n-main" x="382" y="32" width="236" height="52" rx="9"/>
+           <text class="n-title" x="500" y="54" text-anchor="middle">spinnaker_to_rtsp.py</text>
+           <text class="n-sub" x="500" y="71" text-anchor="middle">camera &rarr; RTSP frames</text></g>
+        <!-- B rtsp pill -->
+        <g><rect class="n-rect" x="382" y="128" width="236" height="44" rx="22" style="stroke:var(--accent)"/>
+           <text class="n-title" x="500" y="155" text-anchor="middle" style="font-size:12px">rtsp://127.0.0.1:8554/live</text></g>
+
+        <!-- H StartCapture.sh -->
+        <g><rect class="n-rect n-main" x="52" y="224" width="236" height="52" rx="9"/>
+           <text class="n-title" x="170" y="246" text-anchor="middle">start_nzxxuv.sh NZXXUV</text>
+           <text class="n-sub" x="170" y="263" text-anchor="middle">wrapper: wheel + capture</text></g>
+        <!-- M RMS.StartCapture -->
+        <g><rect class="n-rect n-main" x="382" y="224" width="236" height="52" rx="9"/>
+           <text class="n-title" x="500" y="246" text-anchor="middle">RMS.StartCapture</text>
+           <text class="n-sub" x="500" y="263" text-anchor="middle">records all night</text></g>
+        <!-- CAP -->
+        <g><rect class="n-rect n-store" x="712" y="224" width="236" height="52" rx="9"/>
+           <text class="n-title" x="830" y="246" text-anchor="middle" style="font-size:12px">FF &middot; FS &middot; FT &rarr; CapturedFiles/</text>
+           <text class="n-sub" x="830" y="263" text-anchor="middle">raw frames, this session</text></g>
+
+        <!-- F filter_cycle -->
+        <g><rect class="n-rect n-fw" x="52" y="334" width="236" height="52" rx="9"/>
+           <text class="n-title" x="170" y="356" text-anchor="middle">filter_cycle.py</text>
+           <text class="n-sub" x="170" y="373" text-anchor="middle">night session &middot; NL brackets UV</text></g>
+        <!-- HIST -->
+        <g><rect class="n-rect n-fw" x="52" y="429" width="236" height="52" rx="9"/>
+           <text class="n-title" x="170" y="451" text-anchor="middle">filter_history.txt</text>
+           <text class="n-sub" x="170" y="468" text-anchor="middle">filter timeline (UTC)</text></g>
+
+        <!-- D detection -->
+        <g><rect class="n-rect n-main" x="382" y="429" width="236" height="52" rx="9"/>
+           <text class="n-title" x="500" y="451" text-anchor="middle" style="font-size:12px">DetectStarsAndMeteors.py</text>
+           <text class="n-sub" x="500" y="468" text-anchor="middle">UV &rArr; detect without stars</text></g>
+        <!-- OUT1 -->
+        <g><rect class="n-rect n-store" x="712" y="429" width="236" height="52" rx="9"/>
+           <text class="n-title" x="830" y="451" text-anchor="middle" style="font-size:12px">CALSTARS &middot; FTPdetectinfo</text>
+           <text class="n-sub" x="830" y="468" text-anchor="middle">stars + raw detections</text></g>
+
+        <!-- ML -->
+        <g><rect class="n-rect n-main" x="382" y="534" width="236" height="52" rx="9"/>
+           <text class="n-title" x="500" y="556" text-anchor="middle">MLFilter</text>
+           <text class="n-sub" x="500" y="573" text-anchor="middle">false-positive filter</text></g>
+        <!-- OUT2 -->
+        <g><rect class="n-rect n-store" x="712" y="534" width="236" height="52" rx="9"/>
+           <text class="n-title" x="830" y="556" text-anchor="middle" style="font-size:12px">FTPdetectinfo (filtered)</text>
+           <text class="n-sub" x="830" y="573" text-anchor="middle">confirmed meteors</text></g>
+
+        <!-- AR -->
+        <g><rect class="n-rect n-main" x="382" y="634" width="236" height="52" rx="9"/>
+           <text class="n-title" x="500" y="656" text-anchor="middle">ArchiveDetections</text>
+           <text class="n-sub" x="500" y="673" text-anchor="middle">bundle the night</text></g>
+        <!-- STORE -->
+        <g><rect class="n-rect n-store" x="712" y="628" width="236" height="64" rx="9"/>
+           <text class="n-title" x="830" y="653" text-anchor="middle" style="font-size:12px">ArchivedFiles/</text>
+           <text class="n-sub" x="830" y="670" text-anchor="middle">summaries, timelapse,</text>
+           <text class="n-sub" x="830" y="683" text-anchor="middle">*.tar.bz2 bundles</text></g>
+      </svg>
+
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--accent-soft);border-color:var(--accent)"></span> Main pipeline</span>
+        <span><span class="swatch" style="background:var(--amber-soft);border-color:var(--amber)"></span> Filter wheel</span>
+        <span><span class="swatch" style="background:var(--green-soft);border-color:var(--green)"></span> Stored data</span>
+        <span><span class="swatch" style="background:var(--surface);border-color:var(--border-strong);border-style:dashed"></span> Config / input file</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RUN ============ -->
+  <section>
+    <div class="sec-label">Operating it</div>
+    <h2>Start in two steps</h2>
+    <p>Order matters — the camera stream must exist before capture tries to read it.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="num">STEP 1</div>
+        <h3>Camera &rarr; RTSP</h3>
+        <p style="font-size:.95rem;color:var(--ink-soft)">Tunes the network, opens the FLIR camera with PySpin, and publishes to MediaMTX.</p>
+        <pre>~/Desktop/Workspace/RTSP/<span class="k">start_spinnaker_rtsp.sh</span></pre>
+      </div>
+      <div class="step">
+        <div class="num">STEP 2</div>
+        <h3>Wheel + capture (wrapper)</h3>
+        <p style="font-size:.95rem;color:var(--ink-soft)">Run the wrapper &mdash; <b>not</b> <code>StartCapture.sh</code>, which starts capture only:</p>
+        <pre>~/Desktop/Workspace/<span class="k">start_nzxxuv.sh</span> NZXXUV</pre>
+      </div>
+    </div>
+    <div class="callout info">
+      <span class="tag">Good to know</span>
+      Capture starts only when it is night at the configured coordinates. At Lisbon it begins immediately
+      after dusk; run it during the day and it will wait until sunset.
+    </div>
+  </section>
+
+  <!-- ============ STAGES ============ -->
+  <section>
+    <div class="sec-label">Stage 1</div>
+    <h2>The RTSP stream</h2>
+    <p><code>start_spinnaker_rtsp.sh</code> raises <code>eth0</code> MTU to 9000 and the kernel socket
+      buffers to 16&nbsp;MB, then launches <code>spinnaker_to_rtsp.py</code> on <b>pyenv Python 3.10.14</b>
+      (the only interpreter with PySpin). The script reads <code>spinnaker.config</code>, opens the camera,
+      and publishes through MediaMTX at <code>rtsp://127.0.0.1:8554/live</code>.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Camera serial</td><td class="mono">26176619</td></tr>
+          <tr><td>Binning</td><td class="mono">3&times;3</td></tr>
+          <tr><td>Output</td><td class="mono">1280&times;720 @ 25 fps</td></tr>
+          <tr><td>Exposure / gain</td><td class="mono">40 ms / 24 dB</td></tr>
+          <tr><td>Stream URL</td><td class="mono">rtsp://127.0.0.1:8554/live</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout warn">
+      <span class="tag">Common error</span>
+      <b>ModuleNotFoundError: No module named 'PySpin'</b> — PySpin lives only in pyenv 3.10.14.
+      Opening the script with the default <code>python3</code> (3.13) fails. Always launch via
+      <code>start_spinnaker_rtsp.sh</code>.
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-label">Stage 2</div>
+    <h2>Capture &amp; the filter wheel</h2>
+    <p>The <code>start_nzxxuv.sh</code> wrapper is the launch hub — it starts two things at once. (RMS's
+      own <code>StartCapture.sh</code> only runs capture; an RMS update removed the old in-launcher wheel
+      start, so the wrapper owns that coupling now and survives future updates.)</p>
+    <h3>Records the sky</h3>
+    <p>Runs <code>RMS.StartCapture</code> in the <b>vRMS</b> venv, reading the RTSP stream. Every
+      ~256-frame block (≈10&nbsp;s) it writes an <b>FF</b> frame plus <b>FS</b> field-sum and <b>FT</b>
+      frame-time files into <code>CapturedFiles/</code>, and saves timelapse frames to <code>FramesFiles/</code>.</p>
+    <h3>Cycles the filter</h3>
+    <p>The wrapper launches <code>filter_cycle.py</code> (gated to NZXXUV only). Instead of a fixed duty cycle it runs
+      a <b>whole-night session</b>: a <b>Natural Light calibration burst</b> to build the plate solution,
+      then a long <b>UV observing loop</b> (with optional short NL drift checks), then a closing NL burst
+      that <b>brackets</b> the night. Each change is appended to <code>filter_history.txt</code>; on
+      shutdown the wheel parks back at UV.</p>
+    <p style="font-size:.95rem;color:var(--ink-soft)">Stars are invisible in UV, so a UV streak can't be
+      plate-solved on its own. But for a fixed camera <i>pixel &rarr; (az, alt)</i> is constant in time, so a
+      streak's sky position = its pixel coordinates + the frame's UTC + a plate solution built from the
+      Natural Light frames. NL is calibration, not something that must coincide with a detection — see
+      <code>fw-python-main/FILTER_CYCLE.md</code>.</p>
+    <pre><span class="c"># filter_history.txt — one line per filter change (UTC)</span>
+2026-07-06T21:00:03.512847 Natural Light   <span class="c"># start calibration burst</span>
+2026-07-06T21:03:03.771020 <span class="k">UV</span>              <span class="c"># observing block</span>
+2026-07-06T22:03:04.004311 Natural Light   <span class="c"># drift check</span>
+2026-07-06T22:03:34.219880 <span class="k">UV</span></pre>
+  </section>
+
+  <section>
+    <div class="sec-label">Stage 3 &middot; the custom logic</div>
+    <h2>Detecting meteors in UV without stars</h2>
+    <p>Standard RMS skips meteor detection unless an FF has <b>≥&nbsp;20 stars</b>. In UV there are
+      essentially none — so detection would never run. The customised
+      <code>DetectStarsAndMeteors.py</code> looks up the filter that was active <b>when each frame was
+      captured</b> and overrides that rule for UV.</p>
+    <pre>filter_name = <span class="k">getFilterForTime</span>(config, capture_dt)   <span class="c"># reads filter_history.txt</span>
+<span class="k">if</span> (filter_name == <span class="k">'UV'</span>) <span class="k">or</span> (stars &gt;= config.ff_min_stars):
+    log.info(<span class="k">'detecting meteors'</span>)
+    print(<span class="k">'detecting meteors'</span>, flush=True)   <span class="c"># shown in the terminal</span>
+    ... run meteor detection ...</pre>
+    <div class="callout ok">
+      <span class="tag">Verified 2026-07-06</span>
+      A real capture reprocessed 6 UV frames with only 5–6 stars each (below the 20 threshold). Each
+      printed <code>detecting meteors</code> to the terminal and logged
+      <code>UV filter in use, detecting meteors regardless of star count…</code> — detection ran, exactly as intended.
+    </div>
+    <div class="callout warn">
+      <span class="tag">Root cause fixed</span>
+      Detection originally read the history from the per-station <code>data_dir</code>
+      (<code>~/RMS_data/NZXXUV/</code>) while <code>filter_cycle.py</code> wrote to
+      <code>~/RMS_data/filter_history.txt</code>. One physical wheel &rArr; one fixed history path;
+      both sides now agree.
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-label">Stage 4</div>
+    <h2>After capture ends — reprocessing</h2>
+    <p>When the capture window closes, RMS reprocesses the night:</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Step</th><th>Does</th><th>Produces</th></tr></thead>
+        <tbody>
+          <tr><td>Detection</td><td>Stars + meteors on all FF files</td><td class="mono">CALSTARS, FTPdetectinfo_unfiltered</td></tr>
+          <tr><td>ML filter</td><td>TF-Lite classifies real vs false</td><td class="mono">FTPdetectinfo (filtered)</td></tr>
+          <tr><td>Calibration</td><td>Platepar, flat, field-sum plots</td><td class="mono">*_fieldsums.png</td></tr>
+          <tr><td>Timelapse</td><td>Video from saved frames</td><td class="mono">*_timelapse.mp4</td></tr>
+          <tr><td>Summary</td><td>Config audit + observation summary</td><td class="mono">*_observation_summary.{txt,json}</td></tr>
+          <tr><td>Archive</td><td>Bundle into ArchivedFiles</td><td class="mono">*_imgdata / *_metadata .tar.bz2</td></tr>
+          <tr><td>Upload</td><td><b>Disabled</b> for NZXXUV</td><td class="mono">&mdash;</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ STORAGE ============ -->
+  <section>
+    <div class="sec-label">Where it lands</div>
+    <h2>Data storage map</h2>
+    <pre>~/RMS_data/
+├── <span class="k">filter_history.txt</span>          <span class="c"># machine-wide UV / Natural Light timeline</span>
+├── logs/                       <span class="c"># &lt;date&gt;_NZXXUV_filterwheel.txt</span>
+└── NZXXUV/
+    ├── <span class="k">CapturedFiles/</span>NZXXUV_&lt;start&gt;/   <span class="c"># raw FF/FS files (auto-pruned when full)</span>
+    ├── <span class="k">ArchivedFiles/</span>NZXXUV_&lt;start&gt;/   <span class="c"># night result + .tar.bz2 bundles</span>
+    ├── FramesFiles/&lt;year&gt;/&lt;doy&gt;/       <span class="c"># timelapse JPEGs</span>
+    ├── TimeFiles/&lt;year&gt;/               <span class="c"># frame-time (FT) files</span>
+    └── logs/                          <span class="c"># log_NZXXUV_*.log, detection_log_*.log</span></pre>
+    <div class="callout info">
+      <span class="tag">Two homes</span>
+      <b>CapturedFiles</b> holds the heavy raw frames (~3.7&nbsp;MB each) and is auto-pruned as the disk fills.
+      <b>ArchivedFiles</b> is the durable "night result" — small plots, summaries and the two bundles.
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-label">What the data looks like</div>
+    <h2>Output file reference</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>File</th><th>Contents</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">FF_&hellip;.fits</td><td>Compressed frame block: max / average / std-dev / max-frame images</td></tr>
+          <tr><td class="mono">FTPdetectinfo_&hellip;.txt</td><td>Final meteor detections with per-segment centroids (RA/Dec/Az/Elev/Mag)</td></tr>
+          <tr><td class="mono">CALSTARS_&hellip;.txt</td><td>Extracted star positions &amp; brightness per FF</td></tr>
+          <tr><td class="mono">&hellip;_observation_summary.txt</td><td>Machine, clock sync, capture window, FITS counts</td></tr>
+          <tr><td class="mono">&hellip;_timelapse.mp4</td><td>Full-night timelapse video</td></tr>
+          <tr><td class="mono">&hellip;_captured_stack.jpg</td><td>All-night max-pixel stack image</td></tr>
+          <tr><td class="mono">&hellip;.tar.bz2</td><td>Image + metadata bundles (the upload payload)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>FTPdetectinfo header (real output)</h3>
+    <pre>Meteor Count = 000000
+Processed with RMS 1.0 20260525_&hellip; on 2026-07-06 01:30:11 UTC
+FF folder = /home/rms/RMS_data/NZXXUV/CapturedFiles/NZXXUV_20260706_012808_960600
+Cam# Meteor# #Segments fps hnr mle bin Pix/fm Rho Phi
+Per segment: Frame# Col Row RA Dec Azim Elev Inten Mag Bcknd SNR NSatPx</pre>
+    <p style="font-size:.9rem;color:var(--muted)"><code>Meteor Count = 0</code> here because the test frames
+      were blank — but detection <b>ran</b>, which is the whole point of the UV change.</p>
+  </section>
+
+  <!-- ============ CUSTOMIZATIONS ============ -->
+  <section>
+    <div class="sec-label">This station's changes</div>
+    <h2>Customisations at a glance</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Change</th><th>Lives in</th></tr></thead>
+        <tbody>
+          <tr><td>Detect meteors in UV regardless of star count; log &amp; print <code>detecting meteors</code></td><td class="mono">RMS/DetectStarsAndMeteors.py</td></tr>
+          <tr><td>Filter resolved by capture time from a fixed history log</td><td class="mono">getFilterForTime &rarr; ~/RMS_data/filter_history.txt</td></tr>
+          <tr><td>Filter wheel cycler &mdash; whole-night session: NL calibration bursts bracket the UV observing loop (+ drift checks) for astrometry; parks at UV on exit</td><td class="mono">fw-python-main/filter_cycle.py &middot; FILTER_CYCLE.md</td></tr>
+          <tr><td>Wheel auto-starts with NZXXUV capture via a wrapper (gated per station; survives RMS updates)</td><td class="mono">start_nzxxuv.sh</td></tr>
+          <tr><td>Uploads disabled to the GMN server</td><td class="mono">NZXXUV/.config &middot; upload_enabled: false</td></tr>
+          <tr><td>Location set to Lisbon</td><td class="mono">NZXXUV/.config &middot; lat/lon/elev</td></tr>
+          <tr><td>Desktop shortcut to the live config</td><td class="mono">~/Desktop/NZXXUV.config</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    NZXXUV workflow reference &middot; generated from the live system &middot; last verified end-to-end 2026-07-06
+  </footer>
+</div>
